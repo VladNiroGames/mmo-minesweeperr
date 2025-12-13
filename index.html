@@ -293,26 +293,36 @@
             for(let y=startY; y<startY+GRID_H; y++) {
                 for(let x=startX; x<startX+GRID_W; x++) {
                     const d = document.createElement('div');
-                    d.className = 'cell'; d.style.width = CELL_SIZE+'px'; d.style.height = CELL_SIZE+'px';
+                    d.className = 'cell'; 
+                    d.style.width = CELL_SIZE+'px'; d.style.height = CELL_SIZE+'px';
                     d.style.fontSize = (CELL_SIZE/2.5)+'px';
                     
+                    // --- ВИПРАВЛЕНА ЛОГІКА КЛІКІВ ---
                     if (IS_MOBILE) {
-                        d.onclick = () => { if(mobileMode === 'flag') toggleFlag(x, y); else openCell(x, y); };
-                    } else {
-                        // ПК: ЛКМ + Shift (Прапор) або просто ЛКМ (Копати)
-                        d.onmousedown = (e) => {
-                            if (Date.now() - lastActionTime < 100) return; 
-                            lastActionTime = Date.now();
-                            if(e.button === 0) {
-                                if(e.shiftKey) toggleFlag(x, y); // SHIFT + CLICK
-                                else openCell(x, y);
-                            } else if(e.button === 2) {
-                                toggleFlag(x, y);
-                            }
+                        // Телефони: просто клік, залежить від режиму
+                        d.onclick = () => { 
+                            if(mobileMode === 'flag') toggleFlag(x, y); 
+                            else openCell(x, y); 
                         };
-                        d.oncontextmenu = (e) => { e.preventDefault(); return false; };
+                    } else {
+                        // ПК: Розділяємо логіку
+                        
+                        // 1. ЛІВИЙ КЛІК (Основна дія - відкрити)
+                        d.onclick = (e) => {
+                            // Якщо натиснуто Shift - це прапорець, інакше відкрити
+                            if (e.shiftKey) toggleFlag(x, y);
+                            else openCell(x, y);
+                        };
+
+                        // 2. ПРАВИЙ КЛІК (Тільки прапорець)
+                        d.oncontextmenu = (e) => { 
+                            e.preventDefault(); 
+                            toggleFlag(x, y); 
+                            return false; 
+                        };
                     }
 
+                    // --- МАЛЮВАННЯ ВМІСТУ ---
                     const key = `${x}_${y}`;
                     if(localWorldCache[key]) {
                         const data = localWorldCache[key];
@@ -320,15 +330,20 @@
                             d.classList.add('open');
                             const c = countMines(x, y);
                             if(c>0) { d.innerText = c; d.classList.add(`c${c}`); }
-                        } else if(data.state === 'flag') { d.classList.add('flag'); d.innerText = '🚩';
-                        } else if(data.state === 'defused') { d.classList.add('defused'); d.innerText = '🛡️'; }
+                        } else if(data.state === 'flag') { 
+                            d.classList.add('flag'); d.innerText = '🚩';
+                        } else if(data.state === 'defused') { 
+                            d.classList.add('defused'); d.innerText = '🛡️'; 
+                        }
                     }
 
+                    // Інші гравці
                     Object.keys(onlinePlayersCache).forEach(uid => {
                         if(uid === currentUser.uid) return;
                         const p = onlinePlayersCache[uid];
                         if(p.x === x && p.y === y && (now - p.last_seen < 60000)) {
-                            d.classList.add('other-player'); d.style.color = p.color; d.style.borderColor = p.color;
+                            d.classList.add('other-player'); 
+                            d.style.color = p.color; d.style.borderColor = p.color;
                             let html = `<div class='player-label' style='border-color:${p.color}'>${p.name || 'Player'}</div>`;
                             d.innerHTML += html;
                         }
@@ -432,3 +447,4 @@
     </script>
 </body>
 </html>
+
