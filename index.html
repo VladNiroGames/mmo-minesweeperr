@@ -3,45 +3,49 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>MMO Minesweeper: Stable Gen</title>
+    <title>MMO Minesweeper: More Mines</title>
     
     <style>
+        /* --- CSS --- */
         :root { 
             --bg-color: #121212; --grid-bg: #1e1e1e;
             --cell-closed: #2c2c2c; --cell-hover: #3a3a3a; --cell-open: #181818;
-            --accent-color: #00ff88; --text: #e0e0e0; --danger: #ff4444; 
+            --accent-color: #00ff88; --text-primary: #e0e0e0; --danger-color: #ff4444; 
             --hud-bg: rgba(18, 18, 18, 0.95);
         }
         
         body, html {
             width: 100%; height: 100%; margin: 0; padding: 0;
             background: var(--bg-color); 
-            font-family: 'Segoe UI', Roboto, sans-serif; color: var(--text); 
+            font-family: 'Segoe UI', Roboto, sans-serif; color: var(--text-primary); 
             overflow: hidden; touch-action: none; user-select: none; -webkit-user-select: none;
         }
 
-        /* UI ELEMENTS */
+        /* LOGIN */
         #login-screen { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: #121212; z-index: 5000; display: flex; flex-direction: column; align-items: center; justify-content: center; }
         .login-card { background: #1e1e1e; padding: 40px; border-radius: 16px; border: 1px solid #333; text-align: center; }
         .google-btn { background: white; color: #444; border: none; padding: 12px 24px; border-radius: 4px; font-weight: bold; cursor: pointer; margin-top: 20px; }
 
+        /* HUD */
         #hud { position: fixed; top: 0; left: 0; right: 0; padding: 8px 15px; display: none; justify-content: space-between; align-items: center; background: var(--hud-bg); border-bottom: 1px solid #333; z-index: 1000; }
         .stat-value { font-size: 18px; font-weight: 700; color: var(--accent-color); }
-        .avatar { width: 32px; height: 32px; border-radius: 50%; border: 2px solid var(--accent-color); cursor: pointer; }
+        .user-avatar-hud { width: 32px; height: 32px; border-radius: 50%; border: 2px solid var(--accent-color); cursor: pointer; }
 
+        /* LEADERBOARD */
         #leaderboard { position: fixed; top: 55px; right: 10px; background: var(--hud-bg); border: 1px solid #333; border-radius: 8px; width: 220px; z-index: 900; max-height: 35px; overflow: hidden; display: none; transition: max-height 0.3s; }
         #leaderboard.expanded { max-height: 60vh; overflow-y: auto; }
-        .lb-head { padding: 8px; background: #252525; cursor: pointer; font-weight: bold; font-size: 12px; color: gold; display: flex; justify-content: space-between; }
+        .lb-header { padding: 8px; background: #252525; cursor: pointer; font-weight: bold; font-size: 12px; color: gold; display: flex; justify-content: space-between; }
         .lb-list { list-style: none; padding: 0; margin: 0; font-size: 11px; }
         .lb-list li { padding: 5px 10px; border-bottom: 1px solid #333; display: flex; justify-content: space-between; }
 
+        /* GAME */
         #game-container { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); display: grid; gap: 1px; background: var(--grid-bg); will-change: transform; }
         .cell { background: var(--cell-closed); display: flex; align-items: center; justify-content: center; font-weight: 700; border-radius: 2px; }
         @media (hover: hover) { .cell:hover { background: var(--cell-hover); z-index: 1; cursor: pointer; } }
         
         .cell.open { background: var(--cell-open); }
         .c1 { color: #5c5cff; } .c2 { color: #00e600; } .c3 { color: #ff3333; } .c4 { color: #be2ebe; } .c5 { color: #ff8c00; }
-        .cell.mine { background: var(--danger); border-radius: 50%; } 
+        .cell.mine { background: var(--danger-color) !important; border-radius: 50%; } 
         .cell.flag { color: #ffd700; font-size: 80%; } .cell.defused { background: #ffd700 !important; }
 
         .other-player { outline: 2px solid; z-index: 10; border-radius: 4px; }
@@ -50,7 +54,7 @@
         #online-counter { position: fixed; bottom: 5px; right: 10px; font-size: 12px; color: #888; z-index: 500; display: none;}
         #controls-hint { position: fixed; bottom: 5px; left: 10px; font-size: 10px; color: #555; pointer-events: none; display: none;}
 
-        /* MOBILE JOYSTICK & BUTTONS */
+        /* MOBILE UI */
         #mobile-ui { display: none; position: fixed; top:0; left:0; width:100%; height:100%; pointer-events: none; z-index: 2000; }
         #joystick-zone { position: absolute; bottom: 30px; left: 30px; width: 120px; height: 120px; background: rgba(255, 255, 255, 0.1); border: 2px solid rgba(255, 255, 255, 0.3); border-radius: 50%; pointer-events: auto; }
         #joystick-knob { position: absolute; top: 50%; left: 50%; width: 50px; height: 50px; background: rgba(0, 255, 136, 0.5); border-radius: 50%; transform: translate(-50%, -50%); pointer-events: none; }
@@ -60,10 +64,10 @@
         @media (pointer: coarse) { #mobile-ui { display: block; } }
 
         /* MODALS */
-        .modal { display: none; position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,0.85); z-index: 3000; flex-direction: column; align-items: center; justify-content: center; }
-        .modal-box { background: #1e1e1e; padding: 25px; border-radius: 12px; border: 1px solid #333; text-align: center; width: 80%; max-width: 300px; }
+        .modal-overlay { display: none; position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,0.85); z-index: 3000; flex-direction: column; align-items: center; justify-content: center; }
+        .modal-card { background: #1e1e1e; padding: 25px; border-radius: 12px; border: 1px solid #333; text-align: center; width: 80%; max-width: 300px; }
         .btn { width: 100%; padding: 10px; margin: 5px 0; border: none; border-radius: 6px; font-weight: bold; cursor: pointer; font-size: 16px; }
-        .check-group { display: flex; align-items: center; justify-content: space-between; background: #333; padding: 10px; border-radius: 6px; margin: 15px 0; color: white; font-size: 14px; }
+        .checkbox-container { display: flex; align-items: center; justify-content: space-between; background: #333; padding: 10px; border-radius: 6px; margin: 15px 0; color: white; font-size: 14px; }
     </style>
 </head>
 <body>
@@ -71,6 +75,7 @@
     <div id="login-screen">
         <div class="login-card">
             <h1>MMO Minesweeper</h1>
+            <p style="color:#888;">Infinite Map</p>
             <button class="google-btn" onclick="signInWithGoogle()">Увійти через Google</button>
             <div id="login-error" style="color:red; margin-top:10px;"></div>
         </div>
@@ -79,12 +84,12 @@
     <div id="hud">
         <div style="font-weight:900;">MMO<span style="color:var(--accent-color)">.IO</span></div>
         <div>🏆 <span id="score-display" class="stat-value">0</span></div>
-        <img id="my-avatar" class="avatar" src="" onclick="openSettings()">
+        <img id="my-avatar" class="user-avatar-hud" src="" onclick="openSettings()">
     </div>
 
     <div id="leaderboard">
-        <div class="lb-head" onclick="toggleLeaderboard()">
-            🏆 РЕЙТИНГ <span id="lb-arrow">▼</span>
+        <div class="lb-header" onclick="toggleLeaderboard()">
+            🏆 РЕЙТИНГ (ВСІ) <span id="lb-arrow">▼</span>
         </div>
         <ul id="leader-list" class="lb-list"><li>Завантаження...</li></ul>
     </div>
@@ -99,11 +104,11 @@
         <div class="mode-switch" onclick="toggleMobileMode()"><div id="mobile-mode-icon">⛏️</div></div>
     </div>
 
-    <div id="settings-modal" class="modal">
-        <div class="modal-box">
+    <div id="settings-modal" class="modal-overlay">
+        <div class="modal-card">
             <h3>Налаштування</h3>
             <p id="settings-name" style="color: var(--accent-color);"></p>
-            <div class="check-group">
+            <div class="checkbox-container">
                 <span>Приховати ім'я</span>
                 <input type="checkbox" id="hide-name-check" onchange="togglePrivacy()">
             </div>
@@ -112,9 +117,9 @@
         </div>
     </div>
 
-    <div id="game-over-modal" class="modal">
-        <div class="modal-box">
-            <h2 style="color:var(--danger)">ВИБУХ!</h2>
+    <div id="game-over-modal" class="modal-overlay">
+        <div class="modal-card">
+            <h2 style="color:var(--danger-color)">ВИБУХ!</h2>
             <button class="btn" style="background:var(--accent-color);" onclick="window.openPopupAd()">▶ Ожити</button>
             <button class="btn" style="background:#333; color:white;" onclick="window.restartGame()">💀 Нова гра</button>
         </div>
@@ -134,6 +139,7 @@
             messagingSenderId: "724289406134",
             appId: "1:724289406134:web:7b737bf45b2d35bd365217"
         };
+        
         const AD_LINKS = ["https://otieu.com/4/10319101", "https://otieu.com/4/10319100"];
 
         let app, db, auth, currentUser;
@@ -151,7 +157,6 @@
         let GRID_W = 0, GRID_H = 0;
         const container = document.getElementById('game-container');
 
-        // Init
         try {
             app = initializeApp(firebaseConfig);
             db = getDatabase(app);
@@ -172,28 +177,30 @@
         window.logout = () => signOut(auth).then(() => location.reload());
 
         // --- JOYSTICK ---
-        let joyX=0, joyY=0, joyActive=false, joyInterval=null;
+        let joyX = 0, joyY = 0, joyActive = false, joyInterval = null;
         const joyZone = document.getElementById('joystick-zone');
         const joyKnob = document.getElementById('joystick-knob');
 
         if (IS_MOBILE) {
-            joyZone.addEventListener('touchstart', (e) => { e.preventDefault(); joyActive=true; updateJoy(e.touches[0]); if(!joyInterval) joyInterval=setInterval(applyJoy, 100); }, {passive:false});
-            joyZone.addEventListener('touchmove', (e) => { e.preventDefault(); if(joyActive) updateJoy(e.touches[0]); }, {passive:false});
-            joyZone.addEventListener('touchend', () => { joyActive=false; joyX=0; joyY=0; joyKnob.style.transform=`translate(-50%,-50%)`; clearInterval(joyInterval); joyInterval=null; });
+            joyZone.addEventListener('touchstart', (e) => { e.preventDefault(); joyActive = true; updateJoy(e.touches[0]); if (!joyInterval) joyInterval = setInterval(applyJoyMove, 100); }, {passive: false});
+            joyZone.addEventListener('touchmove', (e) => { e.preventDefault(); if (joyActive) updateJoy(e.touches[0]); }, {passive: false});
+            joyZone.addEventListener('touchend', () => { joyActive = false; joyX = 0; joyY = 0; joyKnob.style.transform = `translate(-50%, -50%)`; clearInterval(joyInterval); joyInterval = null; });
             document.getElementById('controls-hint').style.display = 'none';
         }
-        function updateJoy(t) {
+
+        function updateJoy(touch) {
             const rect = joyZone.getBoundingClientRect();
-            const r = rect.width/2;
-            let dx = t.clientX - (rect.left+r), dy = t.clientY - (rect.top+r);
-            const dist = Math.sqrt(dx*dx+dy*dy);
-            if(dist>r) { dx*=r/dist; dy*=r/dist; }
-            joyX=dx/r; joyY=dy/r;
+            const r = rect.width / 2;
+            let dx = touch.clientX - (rect.left + r);
+            let dy = touch.clientY - (rect.top + r);
+            const dist = Math.sqrt(dx*dx + dy*dy);
+            if (dist > r) { dx *= r/dist; dy *= r/dist; }
+            joyX = dx / r; joyY = dy / r;
             joyKnob.style.transform = `translate(calc(-50% + ${dx}px), calc(-50% + ${dy}px))`;
         }
-        function applyJoy() { if(joyActive && (Math.abs(joyX)>0.1 || Math.abs(joyY)>0.1)) moveCam(joyX>0.3?1:(joyX<-0.3?-1:0), joyY>0.3?1:(joyY<-0.3?-1:0)); }
+        function applyJoyMove() { if (joyActive && (Math.abs(joyX) > 0.1 || Math.abs(joyY) > 0.1)) moveCam(joyX > 0.3 ? 1 : (joyX < -0.3 ? -1 : 0), joyY > 0.3 ? 1 : (joyY < -0.3 ? -1 : 0)); }
 
-        // --- CONTROLS ---
+        // --- КЕРУВАННЯ ---
         window.toggleMobileMode = function() {
             mobileMode = (mobileMode === 'open') ? 'flag' : 'open';
             document.getElementById('mobile-mode-icon').innerText = mobileMode === 'open' ? '⛏️' : '🚩';
@@ -203,12 +210,11 @@
         }
 
         function moveCam(dx, dy) {
-            if(dx===0 && dy===0) return;
+            if(dx === 0 && dy === 0) return;
             camX += dx; camY += dy;
             drawGrid(); savePosition(); updateMyPresence();
         }
 
-        // Fix WASD for any layout
         window.onkeydown = (e) => {
             if(document.activeElement.tagName === 'INPUT') return;
             if(e.code === 'KeyW' || e.key === 'ArrowUp') moveCam(0, -1);
@@ -217,8 +223,9 @@
             if(e.code === 'KeyD' || e.key === 'ArrowRight') moveCam(1, 0);
         };
 
-        // --- USER ---
+        // --- USER DATA ---
         function generateShortId() { return Math.random().toString(36).substring(2, 8).toUpperCase(); }
+
         function loadUserData(user) {
             const userRef = ref(db, `users/${user.uid}`);
             get(userRef).then((snap) => {
@@ -229,17 +236,20 @@
                 updateUI(); loadPosition(); initGame(); updateMyPresence(); initLeaderboard();
             });
         }
+
         function updateUI() {
             document.getElementById('my-avatar').src = userData.photoURL;
             document.getElementById('settings-name').innerText = userData.name + (userData.hideName ? " (Приховано)" : "");
             document.getElementById('hide-name-check').checked = userData.hideName;
         }
+
         function showGameUI() {
             document.getElementById('hud').style.display = 'flex';
             document.getElementById('leaderboard').style.display = 'block';
             document.getElementById('online-counter').style.display = 'block';
             document.getElementById('controls-hint').style.display = 'block';
         }
+
         function updateMyPresence() {
             if(!currentUser) return;
             const myRef = ref(db, `online_players/${currentUser.uid}`);
@@ -249,7 +259,7 @@
             onDisconnect(myRef).remove();
         }
 
-        // --- GAME ---
+        // --- GAME LOGIC ---
         function initGame() {
             onValue(ref(db, 'online_players'), (snap) => {
                 onlinePlayersCache = snap.val() || {};
@@ -263,6 +273,7 @@
             window.addEventListener('resize', updateDimensions);
             updateDimensions();
         }
+
         function updateDimensions() {
             GRID_W = Math.ceil(window.innerWidth / CELL_SIZE) + 2;
             GRID_H = Math.ceil(window.innerHeight / CELL_SIZE) + 2;
@@ -274,23 +285,23 @@
             const startY = camY - Math.floor(GRID_H/2);
             container.style.gridTemplateColumns = `repeat(${GRID_W}, ${CELL_SIZE}px)`;
             container.innerHTML = '';
+
             const now = Date.now();
 
             for(let y=startY; y<startY+GRID_H; y++) {
                 for(let x=startX; x<startX+GRID_W; x++) {
                     const d = document.createElement('div');
-                    d.className = 'cell'; d.style.width = CELL_SIZE+'px'; d.style.height = CELL_SIZE+'px'; d.style.fontSize = (CELL_SIZE/2.5)+'px';
+                    d.className = 'cell'; d.style.width = CELL_SIZE+'px'; d.style.height = CELL_SIZE+'px';
+                    d.style.fontSize = (CELL_SIZE/2.5)+'px';
                     
                     if (IS_MOBILE) {
                         d.onclick = () => { if(mobileMode === 'flag') toggleFlag(x, y); else openCell(x, y); };
                     } else {
-                        // PC Logic
-                        d.onmousedown = (e) => {
-                            if (Date.now() - lastActionTime < 100) return; lastActionTime = Date.now();
-                            if(e.button === 0) { if(e.shiftKey) toggleFlag(x, y); else openCell(x, y); }
-                            else if(e.button === 2) toggleFlag(x, y);
+                        d.onclick = (e) => {
+                            if (e.shiftKey) toggleFlag(x, y);
+                            else openCell(x, y);
                         };
-                        d.oncontextmenu = (e) => { e.preventDefault(); return false; };
+                        d.oncontextmenu = (e) => { e.preventDefault(); toggleFlag(x, y); return false; };
                     }
 
                     const key = `${x}_${y}`;
@@ -318,9 +329,8 @@
             }
         }
 
-        // --- NEW STABLE GENERATION ALGORITHM ---
+        // --- STABLE GENERATION (20% Mines) ---
         function isMine(x, y) {
-            // Integer Hash - гарантує відсутність хвиль і правильну роботу з мінусами
             let i = Math.floor(x);
             let j = Math.floor(y);
             // Bitwise Hash (Murmur-like)
@@ -328,7 +338,7 @@
             h = Math.imul((h ^ j) ^ 0x5851F42D, 2246822507);
             h = Math.imul(h ^ (h >>> 16), 2246822507);
             let val = (h ^ (h >>> 13)) >>> 0;
-            return (val % 100) < 16; // 16% мін
+            return (val % 100) < 20; // 20% мін
         }
 
         function countMines(x, y) {
@@ -409,4 +419,3 @@
     </script>
 </body>
 </html>
-
