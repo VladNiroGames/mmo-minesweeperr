@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>MMO Minesweeper: Fixed</title>
+    <title>MMO Minesweeper: Final Fix</title>
     
     <style>
         /* --- CSS --- */
@@ -89,14 +89,14 @@
 
     <div id="leaderboard">
         <div class="lb-header" onclick="toggleLeaderboard()">
-            🏆 РЕЙТИНГ<span id="lb-arrow">▼</span>
+            🏆 РЕЙТИНГ (ВСІ) <span id="lb-arrow">▼</span>
         </div>
         <ul id="leader-list" class="lb-list"><li>Завантаження...</li></ul>
     </div>
 
     <div id="game-container"></div>
     <div id="online-counter">🟢 Active: <span id="online-count">0</span></div>
-    <div id="controls-hint">PC: ЛКМ=Копати, ПКМ=Прапор</div>
+    <div id="controls-hint">PC: WASD=Рух, Shift+ЛКМ=Прапор</div>
 
     <div id="mobile-ui">
         <div class="mode-label" id="mobile-mode-text" style="color:white;">РЕЖИМ: КОПАТИ</div>
@@ -149,7 +149,7 @@
         let userData = { name: "Player", photoURL: "", shortId: "", hideName: false, score: 0 };
         let lastDeathX=0, lastDeathY=0;
         let myColor = `hsl(${Math.random() * 360}, 80%, 60%)`;
-        let lastActionTime = 0; // Для захисту від подвійного кліку
+        let lastActionTime = 0;
 
         const IS_MOBILE = ('ontouchstart' in window) || (navigator.maxTouchPoints > 0);
         let mobileMode = 'open';
@@ -157,12 +157,10 @@
         let GRID_W = 0, GRID_H = 0;
         const container = document.getElementById('game-container');
 
-        // --- ІНІЦІАЛІЗАЦІЯ ---
         try {
             app = initializeApp(firebaseConfig);
             db = getDatabase(app);
             auth = getAuth(app);
-            
             onAuthStateChanged(auth, (user) => {
                 if (user) {
                     currentUser = user;
@@ -217,12 +215,14 @@
             drawGrid(); savePosition(); updateMyPresence();
         }
 
+        // === ВИПРАВЛЕНЕ КЕРУВАННЯ WASD (Незалежно від розкладки) ===
         window.onkeydown = (e) => {
             if(document.activeElement.tagName === 'INPUT') return;
-            if(['w','ArrowUp'].includes(e.key)) moveCam(0, -1);
-            if(['s','ArrowDown'].includes(e.key)) moveCam(0, 1);
-            if(['a','ArrowLeft'].includes(e.key)) moveCam(-1, 0);
-            if(['d','ArrowRight'].includes(e.key)) moveCam(1, 0);
+            // e.code завжди повертає фізичне місце клавіші (KeyW = там де англ W), навіть якщо увімкнена укр розкладка
+            if(e.code === 'KeyW' || e.key === 'ArrowUp') moveCam(0, -1);
+            if(e.code === 'KeyS' || e.key === 'ArrowDown') moveCam(0, 1);
+            if(e.code === 'KeyA' || e.key === 'ArrowLeft') moveCam(-1, 0);
+            if(e.code === 'KeyD' || e.key === 'ArrowRight') moveCam(1, 0);
         };
 
         // --- USER DATA ---
@@ -299,10 +299,18 @@
                     if (IS_MOBILE) {
                         d.onclick = () => { if(mobileMode === 'flag') toggleFlag(x, y); else openCell(x, y); };
                     } else {
-                        // ПК: ЛКМ = Відкрити
-                        d.onclick = () => openCell(x, y);
-                        // ПК: ПКМ = Прапор (Context Menu)
-                        d.oncontextmenu = (e) => { e.preventDefault(); toggleFlag(x, y); return false; };
+                        // ПК: ЛКМ + Shift (Прапор) або просто ЛКМ (Копати)
+                        d.onmousedown = (e) => {
+                            if (Date.now() - lastActionTime < 100) return; 
+                            lastActionTime = Date.now();
+                            if(e.button === 0) {
+                                if(e.shiftKey) toggleFlag(x, y); // SHIFT + CLICK
+                                else openCell(x, y);
+                            } else if(e.button === 2) {
+                                toggleFlag(x, y);
+                            }
+                        };
+                        d.oncontextmenu = (e) => { e.preventDefault(); return false; };
                     }
 
                     const key = `${x}_${y}`;
@@ -330,10 +338,12 @@
             }
         }
 
-        // --- CORE ACTIONS ---
+        // --- СТАБІЛІЗОВАНА ГЕНЕРАЦІЯ МІН (16% ШАНС) ---
         function isMine(x, y) {
-            const val = Math.sin(x * 12.9898 + y * 78.233) * 43758.5453;
-            return (val - Math.floor(val)) > 0.85;
+            // Використовуємо більш "хаотичний" хеш, щоб уникнути хвиль і скупчень
+            let val = Math.sin(x * 12.9898 + y * 78.233 + 0.5) * 43758.5453;
+            // Перевіряємо дробову частину: якщо менше 0.16 -> міна (16%)
+            return (val - Math.floor(val)) < 0.16;
         }
         function countMines(x, y) {
             let c=0;
@@ -371,13 +381,12 @@
             updateMyPresence();
         }
 
-        // --- ВИПРАВЛЕНО: ТРАНЗАКЦІЯ ДЛЯ ПРАПОРЦЯ ---
         function toggleFlag(x, y) {
             const cellRef = ref(db, `world/${x}_${y}`);
             runTransaction(cellRef, (currentData) => {
                 if (currentData === null) return { state: 'flag', user: currentUser.uid };
-                if (currentData.state === 'flag') return null; // Remove flag
-                return; // Abort if already open
+                if (currentData.state === 'flag') return null; 
+                return; 
             });
             updateMyPresence();
         }
@@ -388,7 +397,6 @@
             document.getElementById('game-over-modal').style.display = 'flex';
         }
 
-        // --- ВИПРАВЛЕНО: РЕЙТИНГ (Завантажує всіх) ---
         function initLeaderboard() {
             const usersRef = ref(db, 'users');
             onValue(usersRef, (snap) => {
@@ -402,7 +410,6 @@
                     if(val && (val.name || val.shortId)) players.push(val);
                 });
 
-                // Сортуємо на клієнті
                 players.sort((a, b) => (b.score || 0) - (a.score || 0));
 
                 players.forEach((p, index) => {
@@ -415,7 +422,6 @@
             });
         }
 
-        // UTILS
         window.savePosition = () => localStorage.setItem('mmo_pos', JSON.stringify({x: camX, y: camY}));
         function loadPosition() { const s = localStorage.getItem('mmo_pos'); if(s) { const p = JSON.parse(s); camX = p.x; camY = p.y; } }
         window.toggleLeaderboard = () => document.getElementById('leaderboard').classList.toggle('expanded');
