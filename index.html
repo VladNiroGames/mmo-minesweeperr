@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>MMO Minesweeper: More Mines</title>
+    <title>MMO Minesweeper: Arena 200x200</title>
     
     <style>
         /* --- CSS --- */
@@ -48,6 +48,9 @@
         .cell.mine { background: var(--danger-color) !important; border-radius: 50%; } 
         .cell.flag { color: #ffd700; font-size: 80%; } .cell.defused { background: #ffd700 !important; }
 
+        /* СТІНА (БЕДРОК) */
+        .cell.wall { background: #000 !important; color: #333; cursor: not-allowed !important; border: 1px solid #111; }
+
         .other-player { outline: 2px solid; z-index: 10; border-radius: 4px; }
         .player-label { position: absolute; top: -20px; left: 50%; transform: translateX(-50%); background: rgba(0,0,0,0.8); color: white; font-size: 10px; padding: 1px 4px; border-radius: 4px; white-space: nowrap; pointer-events: none; z-index: 20; }
 
@@ -75,7 +78,7 @@
     <div id="login-screen">
         <div class="login-card">
             <h1>MMO Minesweeper</h1>
-            <p style="color:#888;">Infinite Map</p>
+            <p style="color:#888;">Map Size: 200x200</p>
             <button class="google-btn" onclick="signInWithGoogle()">Увійти через Google</button>
             <div id="login-error" style="color:red; margin-top:10px;"></div>
         </div>
@@ -144,6 +147,10 @@
 
         let app, db, auth, currentUser;
         let camX = 0, camY = 0;
+        
+        // --- ОБМЕЖЕННЯ МАПИ ---
+        const MAP_LIMIT = 100; // Це означає від -100 до +100 (разом 200 клітинок)
+
         let localWorldCache = {};
         let onlinePlayersCache = {};
         let userData = { name: "Player", photoURL: "", shortId: "", hideName: false, score: 0 };
@@ -211,7 +218,16 @@
 
         function moveCam(dx, dy) {
             if(dx === 0 && dy === 0) return;
-            camX += dx; camY += dy;
+            
+            // ОБМЕЖЕННЯ КАМЕРИ
+            let nextX = camX + dx;
+            let nextY = camY + dy;
+            
+            // Не пускаємо камеру далі кордонів (плюс невеликий буфер, щоб бачити стіну)
+            if (nextX < -MAP_LIMIT || nextX > MAP_LIMIT) return;
+            if (nextY < -MAP_LIMIT || nextY > MAP_LIMIT) return;
+
+            camX = nextX; camY = nextY;
             drawGrid(); savePosition(); updateMyPresence();
         }
 
@@ -294,6 +310,14 @@
                     d.className = 'cell'; d.style.width = CELL_SIZE+'px'; d.style.height = CELL_SIZE+'px';
                     d.style.fontSize = (CELL_SIZE/2.5)+'px';
                     
+                    // ПЕРЕВІРКА КОРДОНІВ МАПИ
+                    if (x < -MAP_LIMIT || x > MAP_LIMIT || y < -MAP_LIMIT || y > MAP_LIMIT) {
+                        d.classList.add('wall');
+                        d.innerText = '#';
+                        container.appendChild(d);
+                        continue; // Пропускаємо додавання логіки кліку для стіни
+                    }
+
                     if (IS_MOBILE) {
                         d.onclick = () => { if(mobileMode === 'flag') toggleFlag(x, y); else openCell(x, y); };
                     } else {
@@ -329,11 +353,10 @@
             }
         }
 
-        // --- STABLE GENERATION (20% Mines) ---
+        // --- STABLE GENERATION ---
         function isMine(x, y) {
             let i = Math.floor(x);
             let j = Math.floor(y);
-            // Bitwise Hash (Murmur-like)
             let h = Math.imul(i ^ 0xDEADBEEF, 2654435761);
             h = Math.imul((h ^ j) ^ 0x5851F42D, 2246822507);
             h = Math.imul(h ^ (h >>> 16), 2246822507);
@@ -360,7 +383,11 @@
                 points++;
                 if (countMines(cx, cy) === 0) {
                     for(let i=-1; i<=1; i++) for(let j=-1; j<=1; j++) {
-                        const nx = cx+i, ny = cy+j, k = `${nx}_${ny}`;
+                        const nx = cx+i, ny = cy+j;
+                        // НЕ ВІДКРИВАЄМО ЗА МЕЖАМИ МАПИ
+                        if (nx < -MAP_LIMIT || nx > MAP_LIMIT || ny < -MAP_LIMIT || ny > MAP_LIMIT) continue;
+
+                        const k = `${nx}_${ny}`;
                         if (!visited.has(k) && !isMine(nx, ny) && localWorldCache[k]?.state !== 'flag') {
                             visited.add(k); queue.push([nx, ny]);
                         }
@@ -415,7 +442,13 @@
         window.openSettings = () => document.getElementById('settings-modal').style.display = 'flex';
         window.togglePrivacy = () => { userData.hideName = document.getElementById('hide-name-check').checked; update(ref(db, `users/${currentUser.uid}`), { hideName: userData.hideName }); updateUI(); updateMyPresence(); }
         window.openPopupAd = () => { window.open(AD_LINKS[Math.floor(Math.random()*AD_LINKS.length)], 'AdWindow', 'width=900,height=700'); setTimeout(() => { update(ref(db, `world/${lastDeathX}_${lastDeathY}`), { state: 'defused' }); document.getElementById('game-over-modal').style.display = 'none'; }, 3000); }
-        window.restartGame = () => { set(ref(db, `users/${currentUser.uid}/score`), 0); document.getElementById('game-over-modal').style.display = 'none'; }
+        window.restartGame = () => { 
+            // Скидаємо рахунок і повертаємо на центр (0,0)
+            set(ref(db, `users/${currentUser.uid}/score`), 0); 
+            camX = 0; camY = 0; 
+            savePosition(); 
+            document.getElementById('game-over-modal').style.display = 'none'; 
+        }
     </script>
 </body>
 </html>
