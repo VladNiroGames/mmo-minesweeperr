@@ -224,15 +224,16 @@
             let nextY = camY + dy;
             
             // Не пускаємо камеру далі кордонів (плюс невеликий буфер, щоб бачити стіну)
-            if (nextX < -MAP_LIMIT || nextX > MAP_LIMIT) return;
-            if (nextY < -MAP_LIMIT || nextY > MAP_LIMIT) return;
+            if (nextX < -MAP_LIMIT || nextX >= MAP_LIMIT) return;
+            if (nextY < -MAP_LIMIT || nextY >= MAP_LIMIT) return;
 
             camX = nextX; camY = nextY;
             drawGrid(); savePosition(); updateMyPresence();
         }
 
         window.onkeydown = (e) => {
-            if(document.activeElement.tagName === 'INPUT') return;
+            if (['INPUT', 'TEXTAREA', 'SELECT'].includes(document.activeElement?.tagName) || e.ctrlKey || e.metaKey || e.altKey) return;
+            if (e.code.startsWith('Arrow')) e.preventDefault();
             if(e.code === 'KeyW' || e.key === 'ArrowUp') moveCam(0, -1);
             if(e.code === 'KeyS' || e.key === 'ArrowDown') moveCam(0, 1);
             if(e.code === 'KeyA' || e.key === 'ArrowLeft') moveCam(-1, 0);
@@ -311,7 +312,7 @@
                     d.style.fontSize = (CELL_SIZE/2.5)+'px';
                     
                     // ПЕРЕВІРКА КОРДОНІВ МАПИ
-                    if (x < -MAP_LIMIT || x > MAP_LIMIT || y < -MAP_LIMIT || y > MAP_LIMIT) {
+                    if (x < -MAP_LIMIT || x >= MAP_LIMIT || y < -MAP_LIMIT || y >= MAP_LIMIT) {
                         d.classList.add('wall');
                         d.innerText = '#';
                         container.appendChild(d);
@@ -344,8 +345,10 @@
                         const p = onlinePlayersCache[uid];
                         if(p.x === x && p.y === y && (now - p.last_seen < 60000)) {
                             d.classList.add('other-player'); d.style.color = p.color; d.style.borderColor = p.color;
-                            let html = `<div class='player-label' style='border-color:${p.color}'>${p.name || 'Player'}</div>`;
-                            d.innerHTML += html;
+                            const label = document.createElement('div');
+                            label.className = 'player-label';
+                            label.textContent = p.name || 'Player';
+                            d.appendChild(label);
                         }
                     });
                     container.appendChild(d);
@@ -371,24 +374,27 @@
         }
 
         function openCell(x, y) {
+            if (!currentUser || x < -MAP_LIMIT || x >= MAP_LIMIT || y < -MAP_LIMIT || y >= MAP_LIMIT) return;
+            const state = localWorldCache[`${x}_${y}`]?.state;
+            if (state === 'open' || state === 'flag' || state === 'defused') return;
             if (isMine(x, y)) { triggerDeath(x, y); return; }
-            if (localWorldCache[`${x}_${y}`]?.state === 'open') return;
             if (Date.now() - lastActionTime < 50) return; lastActionTime = Date.now();
 
-            let queue = [[x, y]], visited = new Set([`${x}_${y}`]), updates = {}, points = 0;
-            while(queue.length > 0 && points < 40) {
-                const [cx, cy] = queue.shift();
-                if (localWorldCache[`${cx}_${cy}`]?.state === 'open') continue;
+            let queue = [[x, y]], head = 0, visited = new Set([`${x}_${y}`]), updates = {}, points = 0;
+            while(head < queue.length && points < 40) {
+                const [cx, cy] = queue[head++];
+                const currentState = localWorldCache[`${cx}_${cy}`]?.state;
+                if (currentState === 'open' || currentState === 'flag' || currentState === 'defused' || isMine(cx, cy)) continue;
                 updates[`world/${cx}_${cy}`] = { state: 'open', user: currentUser.uid };
                 points++;
                 if (countMines(cx, cy) === 0) {
                     for(let i=-1; i<=1; i++) for(let j=-1; j<=1; j++) {
                         const nx = cx+i, ny = cy+j;
                         // НЕ ВІДКРИВАЄМО ЗА МЕЖАМИ МАПИ
-                        if (nx < -MAP_LIMIT || nx > MAP_LIMIT || ny < -MAP_LIMIT || ny > MAP_LIMIT) continue;
+                        if (nx < -MAP_LIMIT || nx >= MAP_LIMIT || ny < -MAP_LIMIT || ny >= MAP_LIMIT) continue;
 
                         const k = `${nx}_${ny}`;
-                        if (!visited.has(k) && !isMine(nx, ny) && localWorldCache[k]?.state !== 'flag') {
+                        if (!visited.has(k) && !isMine(nx, ny) && !['open', 'flag', 'defused'].includes(localWorldCache[k]?.state)) {
                             visited.add(k); queue.push([nx, ny]);
                         }
                     }
@@ -402,6 +408,7 @@
         }
 
         function toggleFlag(x, y) {
+            if (!currentUser || x < -MAP_LIMIT || x >= MAP_LIMIT || y < -MAP_LIMIT || y >= MAP_LIMIT) return;
             const cellRef = ref(db, `world/${x}_${y}`);
             runTransaction(cellRef, (currentData) => {
                 if (currentData === null) return { state: 'flag', user: currentUser.uid };
@@ -430,14 +437,28 @@
                     const li = document.createElement('li');
                     let dName = p.hideName ? (p.shortId || 'Anon') : (p.name || 'Player');
                     if(currentUser && p.name === userData.name) li.style.color = "var(--accent-color)";
-                    li.innerHTML = `<span><b>#${index+1}</b> ${dName}</span> <span>${p.score || 0}</span>`;
+                    const nameSpan = document.createElement('span');
+                    const rank = document.createElement('b');
+                    rank.textContent = `#${index + 1} `;
+                    nameSpan.append(rank, document.createTextNode(dName));
+                    const scoreSpan = document.createElement('span');
+                    scoreSpan.textContent = String(Number(p.score) || 0);
+                    li.append(nameSpan, scoreSpan);
                     list.appendChild(li);
                 });
             });
         }
 
         window.savePosition = () => localStorage.setItem('mmo_pos', JSON.stringify({x: camX, y: camY}));
-        function loadPosition() { const s = localStorage.getItem('mmo_pos'); if(s) { const p = JSON.parse(s); camX = p.x; camY = p.y; } }
+        function loadPosition() {
+            try {
+                const saved = JSON.parse(localStorage.getItem('mmo_pos') || 'null');
+                if (Number.isFinite(saved?.x) && Number.isFinite(saved?.y)) {
+                    camX = Math.max(-MAP_LIMIT, Math.min(MAP_LIMIT - 1, Math.round(saved.x)));
+                    camY = Math.max(-MAP_LIMIT, Math.min(MAP_LIMIT - 1, Math.round(saved.y)));
+                }
+            } catch (error) { console.warn('Invalid saved position', error); }
+        }
         window.toggleLeaderboard = () => document.getElementById('leaderboard').classList.toggle('expanded');
         window.openSettings = () => document.getElementById('settings-modal').style.display = 'flex';
         window.togglePrivacy = () => { userData.hideName = document.getElementById('hide-name-check').checked; update(ref(db, `users/${currentUser.uid}`), { hideName: userData.hideName }); updateUI(); updateMyPresence(); }
@@ -446,7 +467,9 @@
             // Скидаємо рахунок і повертаємо на центр (0,0)
             set(ref(db, `users/${currentUser.uid}/score`), 0); 
             camX = 0; camY = 0; 
-            savePosition(); 
+            savePosition();
+            drawGrid();
+            updateMyPresence();
             document.getElementById('game-over-modal').style.display = 'none'; 
         }
     </script>
