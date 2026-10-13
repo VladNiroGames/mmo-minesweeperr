@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>MMO Minesweeper: Arena 200x200</title>
+    <title>Minesweeper Nexus — Multiplayer Arena</title>
     
     <style>
         /* --- CSS --- */
@@ -71,35 +71,103 @@
         .modal-card { background: #1e1e1e; padding: 25px; border-radius: 12px; border: 1px solid #333; text-align: center; width: 80%; max-width: 300px; }
         .btn { width: 100%; padding: 10px; margin: 5px 0; border: none; border-radius: 6px; font-weight: bold; cursor: pointer; font-size: 16px; }
         .checkbox-container { display: flex; align-items: center; justify-content: space-between; background: #333; padding: 10px; border-radius: 6px; margin: 15px 0; color: white; font-size: 14px; }
+    
+        /* MMO MINESWEEPER — NEO ARENA DESIGN SYSTEM */
+        :root {
+            color-scheme: dark;
+            --bg-color: #070d19; --grid-bg: #101b2e;
+            --cell-closed: #1b2941; --cell-hover: #304764; --cell-open: #0b1424;
+            --accent-color: #59f1c7; --text-primary: #ecf5ff; --danger-color: #fa6379;
+            --hud-bg: rgba(9, 18, 34, .88);
+            --line: rgba(146, 180, 225, .17);
+        }
+        *, *::before, *::after { box-sizing: border-box; }
+        body,html { background: radial-gradient(ellipse at 50% 10%, #19314c 0%, #0c1627 48%, #070d19 100%); }
+        body::before { content: ""; position: fixed; inset: 0; pointer-events: none; z-index: 0; background-image: linear-gradient(rgba(117,173,218,.035) 1px, transparent 1px), linear-gradient(90deg, rgba(117,173,218,.035) 1px, transparent 1px); background-size: 38px 38px; }
+        #login-screen { background: radial-gradient(circle at 50% 20%, #1c3855 0%, #091221 68%); padding: 24px; }
+        .login-card { position: relative; width: min(100%, 440px); padding: 48px 36px; border-radius: 25px; border: 1px solid rgba(106,239,202,.28); background: linear-gradient(145deg, rgba(29,47,72,.95), rgba(10,19,35,.98)); box-shadow: 0 28px 90px rgba(0,0,0,.48), inset 0 1px 0 rgba(255,255,255,.07); }
+        .login-card h1 { font-size: clamp(30px,5vw,44px); letter-spacing: -1.5px; margin: 12px 0; line-height: 1.1; }
+        .login-card p { line-height: 1.7; }
+        .brand-kicker { color: var(--accent-color); text-transform: uppercase; font-size: 11px; font-weight: 800; letter-spacing: 3px; }
+        .google-btn { border-radius: 12px; width: 100%; min-height: 52px; background: var(--accent-color); color: #09231f; box-shadow: 0 7px 28px rgba(89,241,199,.2); transition: transform .16s, filter .16s; }
+        .google-btn:hover { transform: translateY(-2px); filter: brightness(1.08); }
+        #hud { height: 70px; padding: 10px clamp(12px,3vw,32px); border-bottom: 1px solid var(--line); backdrop-filter: blur(18px); box-shadow: 0 12px 30px rgba(0,0,0,.17); gap: 12px; }
+        .hud-brand { font-size: 18px; font-weight: 900; letter-spacing: -.5px; white-space: nowrap; }
+        .hud-brand small { display: block; font-size: 9px; font-weight: 700; letter-spacing: 2px; color: #819cb6; }
+        .score-pill { border: 1px solid rgba(89,241,199,.22); border-radius: 13px; padding: 7px 16px; background: rgba(89,241,199,.07); font-weight: 700; font-size: 12px; }
+        .stat-value { font-size: 21px; padding-left: 6px; font-variant-numeric: tabular-nums; }
+        .user-avatar-hud { width: 42px; height: 42px; border-radius: 14px; border: 2px solid rgba(89,241,199,.6); transition: transform .16s; }
+        .user-avatar-hud:hover { transform: scale(1.07); }
+        #leaderboard { top: 83px; right: 18px; width: 252px; max-height: 43px; background: rgba(12,23,41,.93); border: 1px solid var(--line); border-radius: 15px; box-shadow: 0 16px 45px rgba(0,0,0,.24); backdrop-filter: blur(20px); }
+        #leaderboard.expanded { max-height: min(65vh,520px); }
+        .lb-header { padding: 13px 15px; background: transparent; color: #eaf8ff; font-size: 12px; letter-spacing: .7px; }
+        .lb-list { font-size: 12px; }
+        .lb-list li { padding: 11px 15px; border-color: var(--line); gap: 10px; }
+        .lb-list li:nth-child(odd) { background: rgba(255,255,255,.025); }
+        #game-container { border: 1px solid rgba(119,155,206,.17); border-radius: 10px; padding: 3px; box-shadow: 0 24px 75px rgba(0,0,0,.35), 0 0 0 7px rgba(255,255,255,.015); }
+        .cell { border: 1px solid rgba(167,192,226,.04); border-radius: 5px; transition: background .12s, box-shadow .12s; }
+        @media (hover:hover) { .cell:not(.open):not(.wall):hover { background: #3b5576; box-shadow: inset 0 0 0 1px rgba(89,241,199,.43); } }
+        .cell.open { background: #101b2b; }
+        .c1 { color: #75b7ff; } .c2 { color: #59f1c7; } .c3 { color: #ff7589; } .c4 { color: #cf96ff; } .c5 { color: #ffb86b; }
+        .cell.mine { background: var(--danger-color) !important; }
+        .cell.flag { color: #ffd77d; }
+        .cell.defused { background: #94702d !important; }
+        .cell.wall { background: #040914 !important; color: #32425d; border: 1px solid #0c1625; }
+        .player-label { padding: 4px 7px; top: -23px; border: 1px solid rgba(255,255,255,.18); border-radius: 7px; background: #152943; font-size: 11px; }
+        #online-counter, #controls-hint { bottom: 15px; color: #bdd0e2; font-size: 11px; background: rgba(11,22,40,.85); border: 1px solid var(--line); border-radius: 10px; padding: 10px 13px; backdrop-filter: blur(10px); }
+        #online-counter { right: 16px; }
+        #controls-hint { left: 16px; }
+        .modal-overlay { backdrop-filter: blur(10px); background: rgba(4,10,20,.8); padding: 16px; }
+        .modal-card { background: linear-gradient(150deg,#1c3049,#0d192b); border: 1px solid rgba(110,238,200,.2); border-radius: 22px; box-shadow: 0 30px 90px rgba(0,0,0,.48); width: min(100%,350px); padding: 28px; }
+        .modal-card h2,.modal-card h3 { margin-top: 4px; }
+        .btn { border-radius: 11px; min-height: 45px; transition: filter .15s,transform .15s; }
+        .btn:hover { filter: brightness(1.12); transform: translateY(-1px); }
+        .checkbox-container { border: 1px solid var(--line); background: rgba(255,255,255,.045); }
+        #joystick-zone { background: rgba(44,77,106,.46); border-color: rgba(89,241,199,.45); box-shadow: 0 0 35px rgba(89,241,199,.12); }
+        #joystick-knob { background: rgba(89,241,199,.65); box-shadow: 0 0 25px rgba(89,241,199,.25); }
+        .mode-switch { background: rgba(14,31,48,.95); box-shadow: 0 10px 30px rgba(0,0,0,.4); }
+        .mode-label { background: rgba(14,31,48,.91); padding: 7px 10px; border-radius: 9px; right: 20px; }
+        @media(max-width:600px) {
+            #hud { height: 60px; padding: 8px 12px; }
+            .hud-brand { font-size: 15px; } .hud-brand small { font-size: 8px; }
+            .score-pill { padding: 5px 9px; font-size: 11px; }
+            .stat-value { font-size: 17px; }
+            .user-avatar-hud { width: 35px; height: 35px; }
+            #leaderboard { top: 69px; right: 10px; width: 202px; }
+            #online-counter { bottom: 8px; right: 8px; font-size: 10px; padding: 7px 9px; }
+            .login-card { padding: 38px 24px; }
+        }
+
     </style>
 </head>
 <body>
 
     <div id="login-screen">
         <div class="login-card">
-            <h1>MMO Minesweeper</h1>
-            <p style="color:#888;">Map Size: 200x200</p>
+            <div class="brand-kicker">⚡ GLOBAL MULTIPLAYER ARENA</div>
+            <h1>MINESWEEPER<br><span style="color:var(--accent-color)">NEXUS</span></h1>
+            <p style="color:#a8bfd3;">Спільне мінне поле 200 × 200.<br>Відкривай клітинки, встановлюй прапорці та піднімайся в рейтингу.</p>
             <button class="google-btn" onclick="signInWithGoogle()">Увійти через Google</button>
             <div id="login-error" style="color:red; margin-top:10px;"></div>
         </div>
     </div>
 
     <div id="hud">
-        <div style="font-weight:900;">MMO<span style="color:var(--accent-color)">.IO</span></div>
-        <div>🏆 <span id="score-display" class="stat-value">0</span></div>
+        <div class="hud-brand">MINESWEEPER<span style="color:var(--accent-color)">.NEXUS</span><small>LIVE ARENA · 200 × 200</small></div>
+        <div class="score-pill">🏆 ОЧКИ <span id="score-display" class="stat-value">0</span></div>
         <img id="my-avatar" class="user-avatar-hud" src="" onclick="openSettings()">
     </div>
 
     <div id="leaderboard">
         <div class="lb-header" onclick="toggleLeaderboard()">
-            🏆 РЕЙТИНГ (ВСІ) <span id="lb-arrow">▼</span>
+            🏆 ТАБЛИЦЯ ЛІДЕРІВ <span id="lb-arrow">▼</span>
         </div>
         <ul id="leader-list" class="lb-list"><li>Завантаження...</li></ul>
     </div>
 
     <div id="game-container"></div>
     <div id="online-counter">🟢 Active: <span id="online-count">0</span></div>
-    <div id="controls-hint">PC: WASD=Рух, Shift+ЛКМ=Прапор</div>
+    <div id="controls-hint">WASD / ↑↓←→ — рух · ЛКМ — відкрити · ПКМ / Shift+ЛКМ — прапор</div>
 
     <div id="mobile-ui">
         <div class="mode-label" id="mobile-mode-text" style="color:white;">РЕЖИМ: КОПАТИ</div>
